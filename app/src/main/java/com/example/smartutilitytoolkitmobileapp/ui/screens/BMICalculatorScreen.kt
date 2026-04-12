@@ -292,7 +292,7 @@ fun GenderChip(
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             ),
-            color = if (isSelected) MaterialTheme.colorScheme.primary
+            color = if (isSelected) MaterialTheme.colorScheme.onBackground
             else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
