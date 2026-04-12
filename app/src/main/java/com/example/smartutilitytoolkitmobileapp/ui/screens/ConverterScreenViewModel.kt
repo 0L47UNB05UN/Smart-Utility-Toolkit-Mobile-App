@@ -1,26 +1,19 @@
 package com.example.smartutilitytoolkitmobileapp.ui.screens
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class ConverterScreenUiState(
     val inputValue: String = "1.00",
-    val outputValue: String = "2.204",
+    val outputValue: String = "0.92",
     val fromUnit: String = "Kilograms (kg)",
     val toUnit: String = "Pounds (lb)",
     val conversionRate: Double = 2.20462,
-    val lastUpdated: String = "Updated just now",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isUnitConversion: Boolean = true // true for unit, false for currency
+    val isUnitConversion: Boolean = true
 )
 
 sealed class ConverterEvent {
@@ -29,7 +22,6 @@ sealed class ConverterEvent {
     data class UpdateToUnit(val unit: String) : ConverterEvent()
     data class SwapUnits(val fromUnit: String, val toUnit: String) : ConverterEvent()
     data class ToggleMode(val isUnitConversion: Boolean) : ConverterEvent()
-    object RefreshRates : ConverterEvent()
     object ClearError : ConverterEvent()
 }
 
@@ -38,7 +30,7 @@ class ConverterScreenViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ConverterScreenUiState())
     val uiState: StateFlow<ConverterScreenUiState> = _uiState.asStateFlow()
 
-    // Mock conversion rates database
+    // Unit conversions
     private val unitConversions = mapOf(
         "Kilograms (kg)" to mapOf(
             "Pounds (lb)" to 2.20462,
@@ -49,14 +41,62 @@ class ConverterScreenViewModel : ViewModel() {
             "Kilograms (kg)" to 0.453592,
             "Grams (g)" to 453.592,
             "Ounces (oz)" to 16.0
+        ),
+        "Grams (g)" to mapOf(
+            "Kilograms (kg)" to 0.001,
+            "Pounds (lb)" to 0.00220462,
+            "Ounces (oz)" to 0.035274
+        ),
+        "Ounces (oz)" to mapOf(
+            "Kilograms (kg)" to 0.0283495,
+            "Pounds (lb)" to 0.0625,
+            "Grams (g)" to 28.3495
         )
     )
 
+    // Currency rates (base: USD = 1.0)
     private val currencyRates = mapOf(
         "USD" to mapOf(
             "EUR" to 0.92,
             "GBP" to 0.79,
-            "JPY" to 150.0
+            "JPY" to 150.0,
+            "CAD" to 1.36,
+            "AUD" to 1.52
+        ),
+        "EUR" to mapOf(
+            "USD" to 1.09,
+            "GBP" to 0.86,
+            "JPY" to 163.0,
+            "CAD" to 1.48,
+            "AUD" to 1.65
+        ),
+        "GBP" to mapOf(
+            "USD" to 1.27,
+            "EUR" to 1.16,
+            "JPY" to 190.0,
+            "CAD" to 1.72,
+            "AUD" to 1.92
+        ),
+        "JPY" to mapOf(
+            "USD" to 0.0067,
+            "EUR" to 0.0061,
+            "GBP" to 0.0053,
+            "CAD" to 0.0091,
+            "AUD" to 0.010
+        ),
+        "CAD" to mapOf(
+            "USD" to 0.74,
+            "EUR" to 0.68,
+            "GBP" to 0.58,
+            "JPY" to 110.0,
+            "AUD" to 1.12
+        ),
+        "AUD" to mapOf(
+            "USD" to 0.66,
+            "EUR" to 0.61,
+            "GBP" to 0.52,
+            "JPY" to 99.0,
+            "CAD" to 0.89
         )
     )
 
@@ -76,9 +116,6 @@ class ConverterScreenViewModel : ViewModel() {
             }
             is ConverterEvent.ToggleMode -> {
                 toggleMode(event.isUnitConversion)
-            }
-            is ConverterEvent.RefreshRates -> {
-                refreshRates()
             }
             is ConverterEvent.ClearError -> {
                 _uiState.value = _uiState.value.copy(error = null)
@@ -149,27 +186,7 @@ class ConverterScreenViewModel : ViewModel() {
         val result = input * currentState.conversionRate
 
         _uiState.value = currentState.copy(
-            outputValue = String.format("%.3f", result)
+            outputValue = String.format("%.4f", result)
         )
-    }
-
-    private fun refreshRates() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-
-            // Simulate API call
-            delay(1500)
-
-            val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-            val currentTime = sdf.format(Date())
-
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                lastUpdated = "Updated $currentTime"
-            )
-
-            // In real app, you'd fetch new rates here
-            calculateConversion()
-        }
     }
 }

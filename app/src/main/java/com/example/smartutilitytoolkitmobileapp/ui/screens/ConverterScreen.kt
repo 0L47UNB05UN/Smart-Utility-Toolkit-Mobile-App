@@ -67,8 +67,7 @@ fun ConverterScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 48.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(
@@ -79,7 +78,7 @@ fun ConverterScreen(
             ) {
                 // Header Section
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "Converter.",
@@ -97,7 +96,7 @@ fun ConverterScreen(
 
                 // Converter Module Card
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -205,36 +204,17 @@ fun ConverterScreen(
                             )
                         }
 
-                        // Footer with update info and button
+                        // Footer with update button only
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Info,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = uiState.lastUpdated,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Medium
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
                             Button(
-                                onClick = {
-                                    viewModel.onEvent(ConverterEvent.RefreshRates)
-                                },
-                                modifier = Modifier.height(56.dp),
+                                onClick = { /* Can be used for future features */ },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary
