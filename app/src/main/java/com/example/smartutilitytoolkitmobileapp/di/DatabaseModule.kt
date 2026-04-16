@@ -3,6 +3,7 @@ package com.example.smartutilitytoolkitmobileapp.di
 import android.content.Context
 import com.example.smartutilitytoolkitmobileapp.data.local.TaskDao
 import com.example.smartutilitytoolkitmobileapp.data.local.TaskDatabase
+import com.example.smartutilitytoolkitmobileapp.data.preferences.PreferencesManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,5 +24,11 @@ object DatabaseModule {
     @Provides
     fun provideTaskDao(database: TaskDatabase): TaskDao {
         return database.taskDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePreferencesManager(@ApplicationContext context: Context): PreferencesManager {
+        return PreferencesManager(context)
     }
 }

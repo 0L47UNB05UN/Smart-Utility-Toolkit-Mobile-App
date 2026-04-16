@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,11 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,13 +49,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +73,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.smartutilitytoolkitmobileapp.data.local.TaskEntity
+import com.example.smartutilitytoolkitmobileapp.data.preferences.PreferencesManager
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialOverlay
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialPosition
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialStep
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
     viewModel: TasksViewModel = hiltViewModel()
@@ -72,30 +89,96 @@ fun TasksScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
 
-    // Show keyboard when isAddingTask becomes true
+    // Tutorial state
+    val preferencesManager = remember { PreferencesManager(context) }
+    val coroutineScope = rememberCoroutineScope()
+    var showTutorial by remember { mutableStateOf(false) }
+    var currentTutorialStep by remember { mutableStateOf(0) }
+    var fabPosition by remember { mutableStateOf(Offset.Zero) }
+    var fabSize by remember { mutableStateOf(Size.Zero) }
+    var firstTaskPosition by remember { mutableStateOf(Offset.Zero) }
+    var firstTaskSize by remember { mutableStateOf(Size.Zero) }
+    var taskListPosition by remember { mutableStateOf(Offset.Zero) }
+    var taskListSize by remember { mutableStateOf(Size.Zero) }
+
+    LaunchedEffect(Unit) {
+        preferencesManager.hasSeenTasksTutorial().collect { hasSeen ->
+            if (!hasSeen && uiState.tasks.isEmpty()) {
+                delay(500)
+                showTutorial = true
+            }
+        }
+    }
+
     LaunchedEffect(uiState.isAddingTask) {
         if (uiState.isAddingTask) {
-            kotlinx.coroutines.delay(100)
+            delay(100)
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
 
+    val tutorialSteps = listOf(
+        TutorialStep(
+            key = "welcome",
+            title = "Welcome to Tasks",
+            description = "Keep track of everything you need to do. Let's take a quick tour to see how it works!",
+            position = TutorialPosition.Center
+        ),
+        TutorialStep(
+            key = "add_task",
+            title = "Add a New Task",
+            description = "Tap the + button to create a new task. You can add as many tasks as you need to stay organized.",
+            highlightOffset = fabPosition,
+            highlightSize = fabSize,
+            position = TutorialPosition.Top
+        ),
+        TutorialStep(
+            key = "complete_task",
+            title = "Complete Tasks",
+            description = "Tap on any task to mark it as complete. Completed tasks will move to the bottom with a strikethrough so you can focus on what's left.",
+            highlightOffset = firstTaskPosition,
+            highlightSize = firstTaskSize,
+            position = TutorialPosition.Bottom
+        ),
+        TutorialStep(
+            key = "delete_mode",
+            title = "Delete Tasks",
+            description = "Long press on any task to enter delete mode. Select multiple tasks and tap the trash icon to delete them all at once. Tap Cancel to exit delete mode.",
+            highlightOffset = taskListPosition,
+            highlightSize = taskListSize,
+            position = TutorialPosition.Center
+        ),
+        TutorialStep(
+            key = "ready",
+            title = "You're All Set!",
+            description = "Start adding tasks and stay productive. Enjoy using Tasks!",
+            position = TutorialPosition.Center
+        )
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = {
-                        if (uiState.isAddingTask) {
-                            viewModel.onEvent(TasksEvent.HideAddTaskInput)
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        }
+            .then(
+                if (!showTutorial) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                if (uiState.isAddingTask) {
+                                    viewModel.onEvent(TasksEvent.HideAddTaskInput)
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                }
+                            }
+                        )
                     }
-                )
-            }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
@@ -114,16 +197,43 @@ fun TasksScreen(
                     verticalArrangement = Arrangement.spacedBy(32.dp)
                 ) {
                     // Header
-                    Text(
-                        text = "Tasks",
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontWeight = FontWeight.ExtraBold
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (uiState.isDeleteMode) "Select Tasks" else "Tasks.",
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontWeight = FontWeight.ExtraBold
+                            )
                         )
-                    )
+
+                        if (uiState.isDeleteMode) {
+                            TextButton(
+                                onClick = { viewModel.onEvent(TasksEvent.ExitDeleteMode) }
+                            ) {
+                                Text(
+                                    "Cancel",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
 
                     // Tasks List Card
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .onGloballyPositioned { coordinates ->
+                                taskListPosition = coordinates.positionInRoot()
+                                taskListSize = Size(
+                                    coordinates.size.width.toFloat(),
+                                    coordinates.size.height.toFloat()
+                                )
+                            },
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -131,22 +241,34 @@ fun TasksScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .fillMaxSize()
                                 .padding(24.dp)
                         ) {
                             if (uiState.tasks.isEmpty() && !uiState.isAddingTask) {
                                 // Empty State
                                 Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 48.dp),
+                                    modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "No tasks here yet",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        Text(
+                                            text = "📋",
+                                            style = MaterialTheme.typography.displayLarge
+                                        )
+                                        Text(
+                                            text = "No tasks here yet",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "Tap + to add your first task",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
                                 }
                             } else {
                                 val incompleteTasks = uiState.tasks.filter { !it.isCompleted }
@@ -159,20 +281,39 @@ fun TasksScreen(
                                     items(incompleteTasks) { task ->
                                         TaskItem(
                                             task = task,
+                                            isDeleteMode = uiState.isDeleteMode,
+                                            isSelected = uiState.selectedTasks.contains(task.id),
                                             onToggle = {
-                                                viewModel.onEvent(TasksEvent.ToggleTaskCompletion(task))
+                                                if (uiState.isDeleteMode) {
+                                                    viewModel.onEvent(TasksEvent.ToggleTaskSelection(task.id))
+                                                } else {
+                                                    viewModel.onEvent(TasksEvent.ToggleTaskCompletion(task))
+                                                }
                                             },
-                                            onDelete = {
-                                                viewModel.onEvent(TasksEvent.DeleteTask(task))
+                                            onLongPress = {
+                                                if (!uiState.isDeleteMode) {
+                                                    viewModel.onEvent(TasksEvent.EnterDeleteMode(task.id))
+                                                }
+                                            },
+                                            modifier = if (incompleteTasks.indexOf(task) == 0) {
+                                                Modifier.onGloballyPositioned { coordinates ->
+                                                    firstTaskPosition = coordinates.positionInRoot()
+                                                    firstTaskSize = Size(
+                                                        coordinates.size.width.toFloat(),
+                                                        coordinates.size.height.toFloat()
+                                                    )
+                                                }
+                                            } else {
+                                                Modifier
                                             }
                                         )
                                     }
 
                                     // Completed header
-                                    if (completedTasks.isNotEmpty()) {
+                                    if (completedTasks.isNotEmpty() && !uiState.isDeleteMode) {
                                         item {
                                             Text(
-                                                text = "Completed",
+                                                text = "✓ Completed",
                                                 style = MaterialTheme.typography.titleSmall.copy(
                                                     fontWeight = FontWeight.Bold
                                                 ),
@@ -186,11 +327,19 @@ fun TasksScreen(
                                     items(completedTasks) { task ->
                                         TaskItem(
                                             task = task,
+                                            isDeleteMode = uiState.isDeleteMode,
+                                            isSelected = uiState.selectedTasks.contains(task.id),
                                             onToggle = {
-                                                viewModel.onEvent(TasksEvent.ToggleTaskCompletion(task))
+                                                if (uiState.isDeleteMode) {
+                                                    viewModel.onEvent(TasksEvent.ToggleTaskSelection(task.id))
+                                                } else {
+                                                    viewModel.onEvent(TasksEvent.ToggleTaskCompletion(task))
+                                                }
                                             },
-                                            onDelete = {
-                                                viewModel.onEvent(TasksEvent.DeleteTask(task))
+                                            onLongPress = {
+                                                if (!uiState.isDeleteMode) {
+                                                    viewModel.onEvent(TasksEvent.EnterDeleteMode(task.id))
+                                                }
                                             }
                                         )
                                     }
@@ -199,11 +348,22 @@ fun TasksScreen(
                         }
                     }
 
-                    // Bottom spacing
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Delete Bar (shown in delete mode)
+                    if (uiState.isDeleteMode) {
+                        DeleteBar(
+                            selectedCount = uiState.selectedTasks.size,
+                            onDelete = {
+                                viewModel.onEvent(TasksEvent.ShowDeleteConfirmation)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
 
+            // New Task Dialog
             if (uiState.isAddingTask) {
                 NewTaskDialog(
                     value = uiState.newTaskTitle,
@@ -224,8 +384,52 @@ fun TasksScreen(
                 )
             }
 
-            // Floating Action Button
-            if (!uiState.isAddingTask) {
+            // Delete Confirmation Dialog
+            if (uiState.showDeleteConfirmation) {
+                AlertDialog(
+                    onDismissRequest = {
+                        viewModel.onEvent(TasksEvent.HideDeleteConfirmation)
+                    },
+                    title = {
+                        Text(
+                            "Delete Tasks",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    },
+                    text = {
+                        Text(
+                            "Are you sure you want to delete ${uiState.selectedTasks.size} task${if (uiState.selectedTasks.size > 1) "s" else ""}? This action cannot be undone.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.onEvent(TasksEvent.ConfirmDelete)
+                            }
+                        ) {
+                            Text(
+                                "Delete",
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.onEvent(TasksEvent.HideDeleteConfirmation)
+                            }
+                        ) {
+                            Text("Cancel")
+                        }
+                    },
+                    shape = RoundedCornerShape(20.dp)
+                )
+            }
+
+            // Floating Action Button (hidden in delete mode and when adding task)
+            if (!uiState.isAddingTask && !uiState.isDeleteMode) {
                 FloatingActionButton(
                     onClick = {
                         viewModel.onEvent(TasksEvent.ShowAddTaskInput)
@@ -233,7 +437,14 @@ fun TasksScreen(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(24.dp)
-                        .size(56.dp),
+                        .size(56.dp)
+                        .onGloballyPositioned { coordinates ->
+                            fabPosition = coordinates.positionInRoot()
+                            fabSize = Size(
+                                coordinates.size.width.toFloat(),
+                                coordinates.size.height.toFloat()
+                            )
+                        },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = CircleShape
@@ -244,10 +455,82 @@ fun TasksScreen(
                     )
                 }
             }
+
+            // Tutorial Overlay
+            if (showTutorial) {
+                TutorialOverlay(
+                    steps = tutorialSteps,
+                    currentStep = currentTutorialStep,
+                    onNext = {
+                        if (currentTutorialStep < tutorialSteps.size - 1) {
+                            currentTutorialStep++
+                        } else {
+                            showTutorial = false
+                            coroutineScope.launch {
+                                preferencesManager.setTasksTutorialShown()
+                            }
+                        }
+                    },
+                    onSkip = {
+                        showTutorial = false
+                        coroutineScope.launch {
+                            preferencesManager.setTasksTutorialShown()
+                        }
+                    },
+                    onDismiss = {
+                        showTutorial = false
+                        coroutineScope.launch {
+                            preferencesManager.setTasksTutorialShown()
+                        }
+                    }
+                )
+            }
         }
     }
 }
 
+@Composable
+fun DeleteBar(
+    selectedCount: Int,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "$selectedCount task${if (selectedCount > 1) "s" else ""} selected",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Medium
+            )
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete selected tasks",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewTaskDialog(
     value: String,
@@ -276,18 +559,19 @@ fun NewTaskDialog(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { /* Prevent tap propagation */ }
+                    .clickable { }
                     .imePadding(),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                )
+                ),
+                elevation = CardDefaults.cardElevation(8.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -296,11 +580,14 @@ fun NewTaskDialog(
                     ) {
                         Text(
                             text = "New Task",
-                            style = MaterialTheme.typography.titleMedium.copy(
+                            style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold
                             )
                         )
-                        IconButton(onClick = onDismiss) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
                                 Icons.Default.Close,
                                 contentDescription = "Close"
@@ -311,12 +598,17 @@ fun NewTaskDialog(
                     OutlinedTextField(
                         value = value,
                         onValueChange = onValueChange,
-                        placeholder = { Text("Enter task...") },
+                        placeholder = {
+                            Text(
+                                "What needs to be done?",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 120.dp, max = 200.dp)
                             .focusRequester(focusRequester),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         minLines = 5,
                         maxLines = 5,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -339,7 +631,7 @@ fun NewTaskDialog(
                         enabled = value.isNotBlank()
                     ) {
                         Text(
-                            "Done",
+                            "Add Task",
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Bold
                             )
@@ -354,99 +646,85 @@ fun NewTaskDialog(
 @Composable
 fun TaskItem(
     task: TaskEntity,
+    isDeleteMode: Boolean,
+    isSelected: Boolean,
     onToggle: () -> Unit,
-    onDelete: () -> Unit
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var showDeleteDialog  by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    isDeleteMode -> MaterialTheme.colorScheme.surfaceContainerLowest
+                    else -> MaterialTheme.colorScheme.surfaceContainerLowest
+                }
+            )
+            .combinedClickable(
+                onClick = { onToggle() },
+                onLongClick = { onLongPress() }
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Checkbox
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .combinedClickable(
-                    onClick = { onToggle() },
-                    onLongClick = { showDeleteDialog = true }
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(
+                    when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        task.isCompleted && !isDeleteMode -> MaterialTheme.colorScheme.primary
+                        else -> Color.Transparent
+                    }
                 )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Checkbox
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (task.isCompleted) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerLowest
-                    )
-                    .border(
-                        2.dp,
-                        if (task.isCompleted) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (task.isCompleted) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Completed",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-
-            // Task title
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    textDecoration = if (task.isCompleted) {
-                        TextDecoration.LineThrough
-                    } else {
-                        TextDecoration.None
-                    }
+                .border(
+                    2.dp,
+                    when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        task.isCompleted && !isDeleteMode -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.outlineVariant
+                    },
+                    CircleShape
                 ),
-                color = if (task.isCompleted) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                }
-            )
+            contentAlignment = Alignment.Center
+        ) {
+            if (isSelected || (task.isCompleted && !isDeleteMode)) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = if (isDeleteMode) "Selected" else "Completed",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
 
-        // Delete Confirmation Dialog
-        if (showDeleteDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
-                title = { Text("Delete Task") },
-                text = { Text("Are you sure you want to delete this task?") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            onDelete()
-                            showDeleteDialog = false
-                        }
-                    ) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) {
-                        Text("Cancel")
-                    }
+        // Task title
+        Text(
+            text = task.title,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                textDecoration = if (task.isCompleted && !isDeleteMode) {
+                    TextDecoration.LineThrough
+                } else {
+                    TextDecoration.None
                 }
-            )
-        }
+            ),
+            color = if (task.isCompleted && !isDeleteMode) {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
-@Preview(showBackground = true)
+@Preview
 @Composable
 fun TasksScreenPreview() {
     MaterialTheme {

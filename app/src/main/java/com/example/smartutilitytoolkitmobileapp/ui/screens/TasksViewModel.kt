@@ -14,7 +14,10 @@ import javax.inject.Inject
 data class TasksUiState(
     val tasks: List<TaskEntity> = emptyList(),
     val isAddingTask: Boolean = false,
-    val newTaskTitle: String = ""
+    val newTaskTitle: String = "",
+    val isDeleteMode: Boolean = false,
+    val selectedTasks: Set<Long> = emptySet(),
+    val showDeleteConfirmation: Boolean = false
 )
 
 sealed class TasksEvent {
@@ -23,7 +26,12 @@ sealed class TasksEvent {
     object HideAddTaskInput : TasksEvent()
     object SaveNewTask : TasksEvent()
     data class ToggleTaskCompletion(val task: TaskEntity) : TasksEvent()
-    data class DeleteTask(val task: TaskEntity) : TasksEvent()
+    data class EnterDeleteMode(val initialTaskId: Long) : TasksEvent()
+    object ExitDeleteMode : TasksEvent()
+    data class ToggleTaskSelection(val taskId: Long) : TasksEvent()
+    object ShowDeleteConfirmation : TasksEvent()
+    object HideDeleteConfirmation : TasksEvent()
+    object ConfirmDelete : TasksEvent()
 }
 
 @HiltViewModel
@@ -64,10 +72,35 @@ class TasksViewModel @Inject constructor(
                 saveTask()
             }
             is TasksEvent.ToggleTaskCompletion -> {
-                toggleTaskCompletion(event.task)
+                if (!_uiState.value.isDeleteMode) {
+                    toggleTaskCompletion(event.task)
+                }
             }
-            is TasksEvent.DeleteTask -> {
-                deleteTask(event.task)
+            is TasksEvent.EnterDeleteMode -> {
+                _uiState.value = _uiState.value.copy(
+                    isDeleteMode = true,
+                    selectedTasks = setOf(event.initialTaskId)
+                )
+            }
+            is TasksEvent.ExitDeleteMode -> {
+                _uiState.value = _uiState.value.copy(
+                    isDeleteMode = false,
+                    selectedTasks = emptySet()
+                )
+            }
+            is TasksEvent.ToggleTaskSelection -> {
+                toggleTaskSelection(event.taskId)
+            }
+            is TasksEvent.ShowDeleteConfirmation -> {
+                if (_uiState.value.selectedTasks.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(showDeleteConfirmation = true)
+                }
+            }
+            is TasksEvent.HideDeleteConfirmation -> {
+                _uiState.value = _uiState.value.copy(showDeleteConfirmation = false)
+            }
+            is TasksEvent.ConfirmDelete -> {
+                deleteSelectedTasks()
             }
         }
     }
@@ -96,9 +129,37 @@ class TasksViewModel @Inject constructor(
         }
     }
 
-    private fun deleteTask(task: TaskEntity) {
+    private fun toggleTaskSelection(taskId: Long) {
+        val currentSelected = _uiState.value.selectedTasks
+        val newSelected = if (currentSelected.contains(taskId)) {
+            currentSelected - taskId
+        } else {
+            currentSelected + taskId
+        }
+
+        _uiState.value = _uiState.value.copy(selectedTasks = newSelected)
+
+        // Exit delete mode if no tasks selected
+        if (newSelected.isEmpty()) {
+            _uiState.value = _uiState.value.copy(isDeleteMode = false)
+        }
+    }
+
+    private fun deleteSelectedTasks() {
         viewModelScope.launch {
-            repository.deleteTask(task)
+            val tasksToDelete = _uiState.value.tasks.filter {
+                _uiState.value.selectedTasks.contains(it.id)
+            }
+
+            tasksToDelete.forEach { task ->
+                repository.deleteTask(task)
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isDeleteMode = false,
+                selectedTasks = emptySet(),
+                showDeleteConfirmation = false
+            )
         }
     }
 }

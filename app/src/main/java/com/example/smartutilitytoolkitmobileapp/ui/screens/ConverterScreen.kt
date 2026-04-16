@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -24,42 +23,138 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.smartutilitytoolkitmobileapp.data.preferences.PreferencesManager
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialOverlay
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialPosition
+import com.example.smartutilitytoolkitmobileapp.ui.components.TutorialStep
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConverterScreen(
     viewModel: ConverterScreenViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // Tutorial state
+    val preferencesManager = remember { PreferencesManager(context) }
+    val coroutineScope = rememberCoroutineScope()
+    var showTutorial by remember { mutableStateOf(false) }
+    var currentTutorialStep by remember { mutableStateOf(0) }
+    var modeTogglePosition by remember { mutableStateOf(Offset.Zero) }
+    var modeToggleSize by remember { mutableStateOf(Size.Zero) }
+    var fromInputPosition by remember { mutableStateOf(Offset.Zero) }
+    var fromInputSize by remember { mutableStateOf(Size.Zero) }
+    var swapButtonPosition by remember { mutableStateOf(Offset.Zero) }
+    var swapButtonSize by remember { mutableStateOf(Size.Zero) }
+    var fromUnitPosition by remember { mutableStateOf(Offset.Zero) }
+    var fromUnitSize by remember { mutableStateOf(Size.Zero) }
+    var toUnitPosition by remember { mutableStateOf(Offset.Zero) }
+    var toUnitSize by remember { mutableStateOf(Size.Zero) }
+
+    // Check if tutorial should be shown
+    LaunchedEffect(Unit) {
+        preferencesManager.hasSeenConverterTutorial().collect { hasSeen ->
+            if (!hasSeen) {
+                delay(500)
+                showTutorial = true
+            }
+        }
+    }
+
+    // Tutorial steps
+    val tutorialSteps = listOf(
+        TutorialStep(
+            key = "welcome",
+            title = "Smart Converter",
+            description = "Convert between units and currencies with precision. Let's see how to use it!",
+            position = TutorialPosition.Center
+        ),
+        TutorialStep(
+            key = "mode_toggle",
+            title = "Switch Conversion Mode",
+            description = "Toggle between Unit conversion (kg, lb, etc.) and Currency conversion (USD, EUR, etc.).",
+            highlightOffset = modeTogglePosition,
+            highlightSize = modeToggleSize,
+            position = TutorialPosition.Bottom
+        ),
+        TutorialStep(
+            key = "from_input",
+            title = "Enter Value to Convert",
+            description = "Type the value you want to convert in the FROM field. The conversion happens automatically as you type.",
+            highlightOffset = fromInputPosition,
+            highlightSize = fromInputSize,
+            position = TutorialPosition.Top
+        ),
+        TutorialStep(
+            key = "from_unit",
+            title = "Select Source Unit",
+            description = "Tap the dropdown to choose the unit or currency you want to convert from.",
+            highlightOffset = fromUnitPosition,
+            highlightSize = fromUnitSize,
+            position = TutorialPosition.Bottom
+        ),
+        TutorialStep(
+            key = "swap",
+            title = "Quick Swap",
+            description = "Tap the swap button to instantly reverse the conversion direction. No need to reselect units!",
+            highlightOffset = swapButtonPosition,
+            highlightSize = swapButtonSize,
+            position = TutorialPosition.Center
+        ),
+        TutorialStep(
+            key = "to_unit",
+            title = "Select Target Unit",
+            description = "Tap the dropdown to choose the unit or currency you want to convert to. The result appears automatically.",
+            highlightOffset = toUnitPosition,
+            highlightSize = toUnitSize,
+            position = TutorialPosition.Bottom
+        ),
+        TutorialStep(
+            key = "ready",
+            title = "You're Ready!",
+            description = "Start converting values for your projects, travel, or daily needs. Happy converting!",
+            position = TutorialPosition.Center
+        )
+    )
 
     Surface(
         modifier = Modifier.fillMaxSize()
@@ -67,7 +162,8 @@ fun ConverterScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 48.dp),
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 48.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Column(
@@ -78,7 +174,7 @@ fun ConverterScreen(
             ) {
                 // Header Section
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "Converter.",
@@ -96,7 +192,7 @@ fun ConverterScreen(
 
                 // Converter Module Card
                 Card(
-                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -112,7 +208,14 @@ fun ConverterScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                                .padding(6.dp),
+                                .padding(6.dp)
+                                .onGloballyPositioned { coordinates ->
+                                    modeTogglePosition = coordinates.positionInRoot()
+                                    modeToggleSize = Size(
+                                        coordinates.size.width.toFloat(),
+                                        coordinates.size.height.toFloat()
+                                    )
+                                },
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ModeToggleChip(
@@ -154,9 +257,17 @@ fun ConverterScreen(
                                 units = if (uiState.isUnitConversion) {
                                     listOf("Kilograms (kg)", "Pounds (lb)", "Grams (g)", "Ounces (oz)")
                                 } else {
-                                    listOf("USD", "EUR", "GBP", "JPY")
+                                    listOf("USD", "EUR", "GBP", "JPY", "CAD", "AUD")
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                onInputPositioned = { position, size ->
+                                    fromInputPosition = position
+                                    fromInputSize = size
+                                },
+                                onUnitPositioned = { position, size ->
+                                    fromUnitPosition = position
+                                    fromUnitSize = size
+                                }
                             )
 
                             // Swap Button
@@ -176,6 +287,13 @@ fun ConverterScreen(
                                         MaterialTheme.colorScheme.surfaceContainerLowest,
                                         CircleShape
                                     )
+                                    .onGloballyPositioned { coordinates ->
+                                        swapButtonPosition = coordinates.positionInRoot()
+                                        swapButtonSize = Size(
+                                            coordinates.size.width.toFloat(),
+                                            coordinates.size.height.toFloat()
+                                        )
+                                    }
                             ) {
                                 Icon(
                                     Icons.Default.SwapHoriz,
@@ -197,41 +315,73 @@ fun ConverterScreen(
                                 units = if (uiState.isUnitConversion) {
                                     listOf("Pounds (lb)", "Kilograms (kg)", "Grams (g)", "Ounces (oz)")
                                 } else {
-                                    listOf("EUR", "USD", "GBP", "JPY")
+                                    listOf("EUR", "USD", "GBP", "JPY", "CAD", "AUD")
                                 },
                                 isLoading = uiState.isLoading,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                onUnitPositioned = { position, size ->
+                                    toUnitPosition = position
+                                    toUnitSize = size
+                                }
                             )
                         }
 
-                        // Footer with update button only
+                        // Footer with info
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Button(
-                                onClick = { /* Can be used for future features */ },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
-                                )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    Icons.Outlined.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                                 Text(
-                                    "Update Values",
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
-                                    )
+                                    text = "Rates update automatically",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+
+        // Tutorial Overlay
+        if (showTutorial) {
+            TutorialOverlay(
+                steps = tutorialSteps,
+                currentStep = currentTutorialStep,
+                onNext = {
+                    if (currentTutorialStep < tutorialSteps.size - 1) {
+                        currentTutorialStep++
+                    } else {
+                        showTutorial = false
+                        coroutineScope.launch {
+                            preferencesManager.setConverterTutorialShown()
+                        }
+                    }
+                },
+                onSkip = {
+                    showTutorial = false
+                    coroutineScope.launch {
+                        preferencesManager.setConverterTutorialShown()
+                    }
+                },
+                onDismiss = {
+                    showTutorial = false
+                    coroutineScope.launch {
+                        preferencesManager.setConverterTutorialShown()
+                    }
+                }
+            )
         }
     }
 }
@@ -275,7 +425,9 @@ fun ConversionBlock(
     isEditable: Boolean,
     units: List<String>,
     isLoading: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInputPositioned: ((Offset, Size) -> Unit)? = null,
+    onUnitPositioned: ((Offset, Size) -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -293,7 +445,17 @@ fun ConversionBlock(
         )
 
         // Unit Selector
-        Box {
+        Box(
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                onUnitPositioned?.invoke(
+                    coordinates.positionInRoot(),
+                    Size(
+                        coordinates.size.width.toFloat(),
+                        coordinates.size.height.toFloat()
+                    )
+                )
+            }
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -352,7 +514,23 @@ fun ConversionBlock(
 
         // Value Display/Input
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (isEditable && onInputPositioned != null) {
+                        Modifier.onGloballyPositioned { coordinates ->
+                            onInputPositioned(
+                                coordinates.positionInRoot(),
+                                Size(
+                                    coordinates.size.width.toFloat(),
+                                    coordinates.size.height.toFloat()
+                                )
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                ),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
