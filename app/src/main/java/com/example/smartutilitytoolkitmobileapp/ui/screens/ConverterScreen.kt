@@ -177,7 +177,7 @@ fun ConverterScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Converter.",
+                        text = "Converter",
                         style = MaterialTheme.typography.displayMedium.copy(
                             fontWeight = FontWeight.ExtraBold
                         )
